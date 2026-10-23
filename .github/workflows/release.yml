@@ -1,0 +1,351 @@
+name: Release
+
+# Builds a Windows portable package (bot + dashboard) whenever a version tag is
+# pushed, e.g. `git tag v1.0.0 && git push origin v1.0.0`.
+# Can also be run manually from the Actions tab (build only, no release).
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.10"
+  APP_NAME: Nexus-Trading-System
+  PYINSTALLER_VERSION: ">=6.10,<7"
+
+jobs:
+  build:
+    name: Build Windows portable release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            ict_requirements.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install -r requirements.txt
+          python -m pip install "pyinstaller$env:PYINSTALLER_VERSION"
+
+      - name: Show environment
+        shell: pwsh
+        run: |
+          python --version
+          python -c "import MetaTrader5, pandas, numpy, customtkinter, matplotlib; print('deps OK')"
+          pyinstaller --version
+
+      # ---------------------------------------------------------------------
+      # Build the main bot (console app: it prompts on stdin and logs to it)
+      # ---------------------------------------------------------------------
+      - name: Build live_trading.exe
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --console `
+            --name live_trading `
+            --log-level WARN `
+            --paths . `
+            --hidden-import MetaTrader5 `
+            --hidden-import trading_engine `
+            --hidden-import trading_engine.broker `
+            --hidden-import trading_engine.grid_manager `
+            --hidden-import trading_engine.trading_brain `
+            --hidden-import trading_engine.risk `
+            --hidden-import trading_engine.notifications `
+            --hidden-import trading_engine.security `
+            --exclude-module plotly `
+            --exclude-module matplotlib `
+            --exclude-module tkinter `
+            live_trading.py
+
+      # ---------------------------------------------------------------------
+      # Build the dashboard (GUI app: no console window)
+      # ---------------------------------------------------------------------
+      - name: Build live_dashboard.exe
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --windowed `
+            --name live_dashboard `
+            --log-level WARN `
+            --paths . `
+            --hidden-import MetaTrader5 `
+            --hidden-import trading_engine `
+            --collect-all customtkinter `
+            --collect-data matplotlib `
+            --hidden-import matplotlib.backends.backend_tkagg `
+            --exclude-module plotly `
+            --exclude-module PyQt5 `
+            --exclude-module PyQt6 `
+            --exclude-module PySide2 `
+            --exclude-module PySide6 `
+            --exclude-module IPython `
+            live_dashboard.py
+
+      - name: Verify executables
+        shell: pwsh
+        run: |
+          $expected = @("dist/live_trading.exe", "dist/live_dashboard.exe")
+          foreach ($exe in $expected) {
+            if (-not (Test-Path $exe)) { throw "Build failed: $exe not found" }
+            $mb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+            Write-Host "OK  $exe ($mb MB)"
+          }
+
+      # ---------------------------------------------------------------------
+      # Assemble the portable directory
+      # ---------------------------------------------------------------------
+      - name: Create portable package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = "${env:APP_NAME}-Portable"
+          $stage = "dist/stage"
+          $portable = "$stage/$name"
+
+          New-Item -ItemType Directory -Force -Path $portable | Out-Null
+
+          # Binaries
+          Copy-Item "dist/live_trading.exe"   $portable
+          Copy-Item "dist/live_dashboard.exe" $portable
+
+          # Essential runtime assets
+          Copy-Item "config.yaml"      $portable
+          Copy-Item "README.md"        $portable
+          Copy-Item "requirements.txt" $portable
+
+          # Empty runtime folders (the bot creates/swallows files here).
+          # The .gitkeep placeholder keeps the folder inside the ZIP even for
+          # zip writers that skip empty directories.
+          New-Item -ItemType Directory -Force -Path "$portable/logs" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$portable/market_intelligence" | Out-Null
+          New-Item -ItemType File -Force -Path "$portable/logs/.gitkeep" | Out-Null
+          New-Item -ItemType File -Force -Path "$portable/market_intelligence/.gitkeep" | Out-Null
+
+          # Credentials are NOT shipped - ship a template instead
+          $envTemplate = @'
+          # NEXUS TRADING SYSTEM - MetaTrader 5 credentials
+          # Rename this file to .env and fill in your own values. Never commit it.
+          MT5_LOGIN=
+          MT5_PASSWORD=
+          MT5_SERVER=
+          MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe
+          DISCORD_WEBHOOK_URL=
+          '@
+          Set-Content -Path "$portable/.env.example" -Value $envTemplate -Encoding ASCII
+
+          # Portable launcher: resolves paths relative to its own location,
+          # because live_trading.py loads config.yaml from the CWD.
+          $bat = @'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+
+          set "DASH=live_dashboard.exe"
+          set "BOT=live_trading.exe"
+          if not exist "%BOT%" set "BOT=python live_trading.py"
+
+          echo ============================================
+          echo   NEXUS TRADING SYSTEM - portable launcher
+          echo ============================================
+          echo.
+
+          if /i "%~1"=="dashboard" goto :dashboard
+
+          if exist "%DASH%" (
+              echo [*] Starting dashboard...
+              start "" "%DASH%"
+              timeout /t 2 /nobreak >nul
+          )
+
+          echo [*] Starting trading bot...
+          %BOT% --cron
+          goto :end
+
+          :dashboard
+          if exist "%DASH%" (
+              "%DASH%"
+          ) else (
+              python live_dashboard.py
+          )
+          goto :end
+
+          :end
+          echo.
+          echo [*] Process exited. Press any key to close.
+          pause >nul
+          '@
+          Set-Content -Path "$portable/run_bot.bat" -Value $bat -Encoding ASCII
+
+          $quickstart = @'
+          NEXUS TRADING SYSTEM - Portables
+          =================================
+
+          1. Edit .env.example -> rename to .env and fill MT5_LOGIN / MT5_PASSWORD /
+             MT5_SERVER (and optionally DISCORD_WEBHOOK_URL).
+          2. Make sure the MetaTrader 5 terminal is installed and logged in.
+          3. Review config.yaml (symbol, risk, fib_dca, grid settings).
+          4. Double-click run_bot.bat  -> starts dashboard + bot (--cron mode).
+             Double-click run_bot.bat dashboard  -> dashboard only.
+
+          Notes
+          -----
+          * The active Windows account must be logged in; MT5 needs an interactive
+            desktop session (do not run as a service).
+          * Do not run two instances against the same account/terminal.
+          * Logs are written to logs\ next to the .exe files.
+          * Windows SmartScreen may warn on first run (unsigned binary):
+            More info -> Run anyway.
+          '@
+          Set-Content -Path "$portable/PORTABLE-README.txt" -Value $quickstart -Encoding ASCII
+
+          Write-Host "Portable layout:"
+          Get-ChildItem -Force -Recurse $portable | Select-Object FullName | Format-Table -AutoSize
+
+      # ---------------------------------------------------------------------
+      # Zip it up. Entries are written explicitly with "/" separators (the ZIP
+      # spec requires them; Compress-Archive and ZipFile::CreateFromDirectory
+      # can emit "\" on Windows, which breaks non-Windows extractors).
+      # Directory entries are included so the empty logs/ + market_intelligence/
+      # folders survive extraction.
+      # ---------------------------------------------------------------------
+      - name: Create ZIP archive
+        shell: pwsh
+        run: |
+          $name = "${env:APP_NAME}-Portable"
+          $zip = "dist/$name.zip"
+          $stage = (Resolve-Path "dist/stage").Path
+          $total = (Get-ChildItem -LiteralPath $stage -Recurse -File | Measure-Object -Property Length -Sum).Sum
+
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+
+          $archive = [System.IO.Compression.ZipFile]::Open(
+            (Join-Path (Resolve-Path "dist").Path "$name.zip"),
+            [System.IO.Compression.ZipArchiveMode]::Create
+          )
+          try {
+            # GetEntry() is not supported in Create mode on .NET Framework, so
+            # folder entries are de-duplicated here instead.
+            $seenDir = [System.Collections.Generic.HashSet[string]]::new()
+            Get-ChildItem -LiteralPath $stage -Recurse -Force | ForEach-Object {
+              $rel = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+              if ($_.PSIsContainer) {
+                if ($seenDir.Add("$rel/")) { [void]$archive.CreateEntry("$rel/") }
+              }
+              else {
+                $entry = $archive.CreateEntry($rel, [System.IO.Compression.CompressionLevel]::Optimal)
+                $entry.LastWriteTime = $_.LastWriteTime
+                $out = $entry.Open()
+                $src = [System.IO.File]::OpenRead($_.FullName)
+                try { $src.CopyTo($out) } finally { $out.Dispose(); $src.Dispose() }
+              }
+            }
+          }
+          finally {
+            $archive.Dispose()
+          }
+
+          # Verify the archive actually contains what the release promises
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip).Path)
+          try {
+            $names = @($archive.Entries | ForEach-Object { $_.FullName })
+            $names | ForEach-Object { Write-Host "  $_" }
+            foreach ($file in @("config.yaml", "run_bot.bat", "README.md",
+                                "live_trading.exe", "live_dashboard.exe")) {
+              if ($names -notcontains "$name/$file") { throw "ZIP is missing $name/$file" }
+            }
+            foreach ($dir in @("logs", "market_intelligence")) {
+              if (-not ($names | Where-Object { $_ -eq "$name/$dir/" -or $_ -like "$name/$dir/*" })) {
+                throw "ZIP is missing the $dir/ folder"
+              }
+            }
+          }
+          finally {
+            $archive.Dispose()
+          }
+
+          $mb = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+          Write-Host "Created $zip ($mb MB, $($names.Count) entries, $([math]::Round($total / 1MB, 1)) MB uncompressed)"
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            "dist/${env:APP_NAME}-Portable.zip",
+            "dist/live_trading.exe",
+            "dist/live_dashboard.exe"
+          )
+          Get-FileHash -Algorithm SHA256 -Path $files |
+            ForEach-Object { "{0}  {1}" -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf) } |
+            Set-Content -Path "dist/SHA256SUMS.txt" -Encoding ASCII
+          Get-Content "dist/SHA256SUMS.txt"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-trading-system-windows
+          path: |
+            dist/${{ env.APP_NAME }}-Portable.zip
+            dist/live_trading.exe
+            dist/live_dashboard.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: NEXUS TRADING SYSTEM ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          append_body: true
+          body: |
+            ## Windows build — ${{ github.ref_name }}
+
+            | Asset | Description |
+            | --- | --- |
+            | `Nexus-Trading-System-Portable.zip` | Portable package (bot + dashboard + config + launcher) |
+            | `live_trading.exe` | Main trading bot (console, `--cron` ready) |
+            | `live_dashboard.exe` | Tkinter live dashboard (GUI) |
+            | `SHA256SUMS.txt` | SHA-256 checksums |
+
+            **Quick start:** extract the ZIP, copy `.env.example` to `.env` with your
+            MT5 credentials, review `config.yaml`, then run `run_bot.bat`.
+            See `PORTABLE-README.txt` inside the archive.
+
+            Built on `windows-latest` with Python ${{ env.PYTHON_VERSION }} via PyInstaller.
+          files: |
+            dist/${{ env.APP_NAME }}-Portable.zip
+            dist/live_trading.exe
+            dist/live_dashboard.exe
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
