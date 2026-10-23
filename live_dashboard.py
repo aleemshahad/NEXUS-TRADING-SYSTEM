@@ -1,3 +1,59 @@
+import os
+import sys
+import time
+import threading
+
+# ---------------------------------------------------------------------------
+# Instant launch splash — shown BEFORE the heavy engine imports.
+# customtkinter / MetaTrader5 / pandas / matplotlib can take 2-40s on a cold
+# start, during which the user sees nothing and assumes the dashboard is dead.
+# Only active when this file is launched directly (python live_dashboard.py).
+# ---------------------------------------------------------------------------
+if __name__ == "__main__" and "--no-splash" not in sys.argv:
+    import tkinter as _tk
+
+    _splash = _tk.Tk()
+    _splash.title("NEXUS TRADING SYSTEM")
+    _sw, _sh = 480, 150
+    _sx = (_splash.winfo_screenwidth() - _sw) // 2
+    _sy = (_splash.winfo_screenheight() - _sh) // 3
+    _splash.geometry(f"{_sw}x{_sh}+{_sx}+{_sy}")
+    _splash.configure(bg="#070a0e")
+    _tk.Label(_splash, text="NEXUS TRADING SYSTEM", fg="#ffffff", bg="#070a0e",
+              font=("Segoe UI", 17, "bold")).pack(pady=(30, 6))
+    _status = _tk.Label(_splash, text="\u25cf Loading trading engine...", fg="#00FF66",
+                        bg="#070a0e", font=("Consolas", 10))
+    _status.pack()
+    _result = {}
+
+    def _load_engine():
+        try:
+            import importlib
+            _result["mod"] = importlib.import_module("live_dashboard")
+        except BaseException as _e:
+            _result["e"] = _e
+
+    _worker = threading.Thread(target=_load_engine, daemon=True)
+    _worker.start()
+    _dots = 0
+    while _worker.is_alive():
+        try:
+            _dots = (_dots + 1) % 4
+            _status.configure(text="\u25cf Loading trading engine" + "." * (_dots + 1))
+            _splash.update()
+        except Exception:
+            break
+        time.sleep(0.35)
+    if "e" in _result:
+        from tkinter import messagebox as _mb
+        _mb.showerror("NEXUS TRADING SYSTEM", f"Boot failed:\n{_result['e']}")
+        sys.exit(1)
+    _engine = _result["mod"]
+    _splash.destroy()
+    _app = _engine.LivePortfolioDashboard()
+    _app.run()
+    sys.exit(0)
+
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk, messagebox
@@ -7,10 +63,7 @@ import MetaTrader5 as mt5
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import threading
-import time
 import math
-import os
 import json
 from pathlib import Path
 from dotenv import load_dotenv
@@ -58,15 +111,15 @@ class LivePortfolioDashboard:
         self._growing = False
 
         # --- Enhanced curve state ---
-        self._anim_mode = None          # "grow" | "pulse" | None
-        self._pulse_frame = 0
+        self._anim_mode = None          # "grow" | None
         self._grow_n = 0                # display points currently revealed
         self._grow_from = 0
         self._grow_to = 0
         self._grow_frame = 0
         self._grow_frames = 12
-        self._live_dot = None           # pulsating live-price marker
-        self._live_glow = None          # soft halo behind it
+        self._live_dot = None           # endpoint_core (last-point marker)
+        self._live_glow = None          # endpoint_halo (10s heartbeat pulse ring)
+        self._heartbeat_job = None      # pending 10s heartbeat pulse job
         self._disp = None               # sampled display series (np array)
         self._base = 0.0                # start-balance baseline
         self._ylo = 0.0
@@ -83,6 +136,13 @@ class LivePortfolioDashboard:
         self._dot_step = 0
         self._ticker_job = None
         self._chart_resize_job = None
+        self._bot_online = None
+        self._dca_current = 0.0
+        self._dca_target = 0.0
+        self._dca_job = None
+        self._log_placeholder_job = None
+        self._log_real_seen = False
+        self._placeholder_idx = 0
         
         self._create_widgets()
         
@@ -143,18 +203,33 @@ class LivePortfolioDashboard:
             return
         self._flash_job = self.root.after(70, self._ease_pnl_flash)
 
+    def _make_dot_shades(self, hex_color, dim=0.40, steps=10):
+        """Sine brightness ramp for a subtle CSS-like pulse on the status dot."""
+        try:
+            r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+        except Exception:
+            return [hex_color]
+        shades = []
+        for i in range(steps):
+            t = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / steps))
+            f = dim + (1.0 - dim) * t
+            shades.append('#%02x%02x%02x' % (min(255, int(r * f)),
+                                             min(255, int(g * f)),
+                                             min(255, int(b * f))))
+        return shades
+
     def _animate_status_dot(self):
-        """Green pulsing SYSTEM ACTIVE dot."""
+        """Smooth sine-pulsing SYSTEM ACTIVE dot (green=active, orange=standby)."""
         if not self.running:
             self._dot_job = None
             return
-        shades = (self.C['green'], '#00cc55', '#009944', '#00cc55')
+        shades = self._dot_shades or [self.C['green']]
         try:
             self.status_dot.configure(text_color=shades[self._dot_step % len(shades)])
         except Exception:
             pass
         self._dot_step += 1
-        self._dot_job = self.root.after(650, self._animate_status_dot)
+        self._dot_job = self.root.after(170, self._animate_status_dot)
 
     def _setup_styles(self):
         # Modern palette
@@ -165,6 +240,7 @@ class LivePortfolioDashboard:
             'orange': '#ffa726', 'red': '#FF4D4D', 'purple': '#a78bfa',
             'chip': '#141d27', 'dim': '#7b8b9a', 'flash': '#00FFC8',
         }
+        self._dot_shades = self._make_dot_shades(self.C['green'])
         self.style.configure("TFrame", background=self.C['bg'])
         self.style.configure("Card.TFrame", background=self.C['card'], relief="flat", borderwidth=0)
         self.style.configure("TLabel", background=self.C['card'], foreground=self.C['text'], font=('Segoe UI', 10))
@@ -417,12 +493,16 @@ class LivePortfolioDashboard:
         self.chart_fig = Figure(figsize=(3.2, 1.7), dpi=100, facecolor=self.C['card'])
         self.chart_ax = self.chart_fig.add_subplot(111)
         self.chart_ax.set_facecolor(self.C['card'])
-        self.chart_fig.subplots_adjust(left=0.11, right=0.995, top=0.93, bottom=0.04)
+        # Full-bleed margins (skill: customtkinter_chart_skill.md) — plot fills the card
+        self.chart_fig.subplots_adjust(left=0.11, right=0.96, top=0.90, bottom=0.14)
         self.chart_agg = FigureCanvasTkAgg(self.chart_fig, master=chart_host)
         self.chart_canvas = self.chart_agg.get_tk_widget()
-        self.chart_canvas.configure(highlightthickness=0, bd=0)
+        # Widget bg must match the card so any not-yet-painted area blends in
+        # instead of showing a white Tk-canvas patch on resize (white glitch).
+        self.chart_canvas.configure(highlightthickness=0, bd=0, bg=self.C['card'])
         self.chart_canvas.grid(row=0, column=0, sticky="nsew")
         self.chart_canvas.bind("<Configure>", self._on_chart_resize)
+        chart_host.bind("<Configure>", self._on_chart_resize)  # parent frame resize → zero dead space
 
         # Right: Risk + Exposure
         self.right_col = self._card(self.content_frame)
@@ -470,6 +550,7 @@ class LivePortfolioDashboard:
         self.log_text.tag_config("ERROR", foreground=self.C['red'])
         self.log_text.configure(state="disabled")
         calc_inner.grid_rowconfigure(2, weight=1)
+        self._seed_log_console()
 
         # ============ 6. FOOTER ============
         footer = ctk.CTkFrame(main_frame, fg_color="transparent")
@@ -504,6 +585,13 @@ class LivePortfolioDashboard:
                                              text_color="#06121c", corner_radius=7, height=30, font=btn_font)
         self.btn_full_report.grid(row=0, column=3, sticky="w", padx=(0, 6))
 
+        # Subtle glow ring on hover (additive bind keeps CTk's own color swap)
+        for btn, glow in ((self.btn_emergency_reset, "#ff8a80"),
+                          (self.btn_delete_pendings, "#ffab91"),
+                          (self.btn_clear_history, "#ffd180"),
+                          (self.btn_full_report, "#80d8ff")):
+            self._bind_button_glow(btn, glow)
+
         # ============ 7. TICKER ============
         ticker_bg = ctk.CTkFrame(main_frame, fg_color=self.C['bg'], height=28, corner_radius=0)
         ticker_bg.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(8, 6))
@@ -516,6 +604,21 @@ class LivePortfolioDashboard:
         self.ticker_label.place(x=0, y=6)
         self._scroll_ticker()
         self._animate_status_dot()
+
+    def _bind_button_glow(self, btn, glow_color):
+        """Smooth hover polish: a soft border glow around the button."""
+        def on_enter(e):
+            try:
+                btn.configure(border_width=1, border_color=glow_color)
+            except Exception:
+                pass
+        def on_leave(e):
+            try:
+                btn.configure(border_width=0)
+            except Exception:
+                pass
+        btn.bind("<Enter>", on_enter, "+")
+        btn.bind("<Leave>", on_leave, "+")
 
     def _delete_pendings(self):
         if not messagebox.askyesno("Confirm", "Delete all pending orders?"): return
@@ -1070,11 +1173,20 @@ class LivePortfolioDashboard:
         if not self.running: return
         
         try:
-            # 0. Check if live trading is still active via lock file
+            # 0. Bot link status via lock file — standalone mode stays OPEN
+            #    in STANDBY (the bot terminates this process itself on exit).
             lock_file = Path("logs/trading_active.lock")
-            if not lock_file.exists():
-                self._on_closing()
-                return
+            bot_online = lock_file.exists()
+            if bot_online != self._bot_online:
+                self._bot_online = bot_online
+                if bot_online:
+                    self.status_label.configure(text="SYSTEM ACTIVE", text_color=self.C['green'])
+                    self._dot_shades = self._make_dot_shades(self.C['green'])
+                    self._dot_step = 0
+                else:
+                    self.status_label.configure(text="BOT OFFLINE - STANDBY", text_color=self.C['orange'])
+                    self._dot_shades = self._make_dot_shades(self.C['orange'])
+                    self._dot_step = 0
 
             # 1. Update Account and Trading Stats
             acc = mt5.account_info()
@@ -1113,10 +1225,11 @@ class LivePortfolioDashboard:
                 if not self.equity_history:
                     self.equity_history.append(self.start_balance or equity)
                 
-                # Append every ~5s when equity moved, else heartbeat every 60s
+                # Skill rule: append ONLY when real PnL/equity changed — never
+                # push fake points on a plain timer heartbeat.
                 last_point = self.equity_history[-1]
                 delta_sufficient = abs(equity - last_point) > 0.005
-                if (now - self._last_chart_append > 5 and delta_sufficient) or now - self._last_chart_append > 60:
+                if now - self._last_chart_append > 5 and delta_sufficient:
                     self.equity_history.append(round(equity, 2))
                     if len(self.equity_history) > 300: self.equity_history.pop(0)
                     self._last_chart_append = now
@@ -1131,7 +1244,20 @@ class LivePortfolioDashboard:
                 self._save_reset_config() # Persist new drawdown peak
             
             self.cards['drawdown_val'].configure(text=f"${self.session_max_drawdown:,.2f}")
-            
+
+            # Belt-and-suspenders: if Configure events were missed, force the
+            # figure to match the actual canvas size (zero dead space).
+            try:
+                cw = self.chart_canvas.winfo_width()
+                ch = self.chart_canvas.winfo_height()
+                if cw > 40 and ch > 40:
+                    fw = int(self.chart_fig.get_size_inches()[0] * self.chart_fig.dpi)
+                    fh = int(self.chart_fig.get_size_inches()[1] * self.chart_fig.dpi)
+                    if abs(cw - fw) > 2 or abs(ch - fh) > 2:
+                        self._apply_chart_size(cw, ch)
+            except Exception:
+                pass
+
             self._draw_chart(animate=True)
             self._update_risk_calculator(positions)
             self._update_positions_tree(positions)
@@ -1210,35 +1336,52 @@ class LivePortfolioDashboard:
                 self._render_curve()
                 if n >= self._grow_to:
                     self._growing = False
-                    self._start_pulse_anim()
+                    self._schedule_heartbeat()
                 else:
                     self._schedule_anim(50, "grow")
-            elif mode == "pulse":
-                self._pulse_frame += 1
-                self._step_pulse_render()
-                self._schedule_anim(72, "pulse")
         except Exception as e:
             print(f"Chart anim error: {e}")
             self._anim_mode = None
             self._chart_anim_job = None
 
-    def _start_pulse_anim(self):
-        """Breathing halo on the live dot (continuous but cheap & smooth)."""
-        if self._live_dot is None:
+    def _schedule_heartbeat(self):
+        """Start the 10s endpoint-beacon pulse loop if not already armed."""
+        if self._heartbeat_job is not None:
             return
-        self._schedule_anim(72, "pulse")
+        self._heartbeat_job = self.root.after(10000, self._trigger_endpoint_heartbeat)
 
-    def _step_pulse_render(self):
-        if self._live_dot is None:
-            self._anim_mode = None
+    def _trigger_endpoint_heartbeat(self, step=0):
+        """Pulse ONLY the endpoint halo at the last curve point (no fake data)."""
+        self._heartbeat_job = None
+        if not self.running or self._live_dot is None or self._live_glow is None:
+            if self.running:
+                self._heartbeat_job = self.root.after(10000, self._trigger_endpoint_heartbeat)
             return
-        t = (self._pulse_frame % 26) / 26.0
-        wave = (1.0 - math.cos(t * 2.0 * math.pi)) / 2.0
-        if self._live_glow is not None:
-            self._live_glow.set_markersize(9.0 + wave * 12.0)
-            self._live_glow.set_alpha(0.30 * (1.0 - wave * 0.6))
-        if self._live_dot is not None:
-            self._live_dot.set_markersize(4.6 + wave * 1.1)
+        try:
+            # Lock dot to the last revealed point of the curve
+            last_x = list(self._live_dot.get_xdata())
+            last_y = list(self._live_dot.get_ydata())
+            self._live_glow.set_data(last_x, last_y)
+            self._live_dot.set_data(last_x, last_y)
+
+            # Smooth multi-frame pulse burst (skill: customtkinter_chart_skill.md)
+            pulse_frames = [(10, 0.65), (14, 0.45), (18, 0.25), (22, 0.10), (10, 0.35)]
+            if step < len(pulse_frames):
+                size, alpha = pulse_frames[step]
+                self._live_glow.set_markersize(size)
+                self._live_glow.set_alpha(alpha)
+                self.chart_agg.draw_idle()
+                self._heartbeat_job = self.root.after(80, lambda: self._trigger_endpoint_heartbeat(step + 1))
+            else:
+                # Resting halo, then schedule next heartbeat in 10 seconds
+                self._live_glow.set_markersize(12)
+                self._live_glow.set_alpha(0.4)
+                self.chart_agg.draw_idle()
+                self._heartbeat_job = self.root.after(10000, self._trigger_endpoint_heartbeat)
+        except Exception as e:
+            print(f"Endpoint heartbeat error: {e}")
+            if self.running:
+                self._heartbeat_job = self.root.after(10000, self._trigger_endpoint_heartbeat)
         self.chart_agg.draw_idle()
 
     def _sample_series(self, points, target=160):
@@ -1304,11 +1447,11 @@ class LivePortfolioDashboard:
         ax.plot(xs, ys, color=col, linewidth=2.0,
                 solid_capstyle="round", zorder=4)
 
-        # Live dot + halo
+        # Endpoint beacon: core dot + halo (pulsed only on the 10s heartbeat)
         (self._live_glow,) = ax.plot([xs[-1]], [ys[-1]], marker="o", linestyle="none",
-                                     markersize=13, color=col, alpha=0.30, zorder=5)
+                                     markersize=12, color=col, alpha=0.4, zorder=5)
         (self._live_dot,) = ax.plot([xs[-1]], [ys[-1]], marker="o", linestyle="none",
-                                    markersize=5, color=self.C['mint'],
+                                    markersize=6, color=self.C['mint'],
                                     markeredgecolor=col, markeredgewidth=1.2, zorder=6)
 
         # Grid + spines + dims
@@ -1333,10 +1476,10 @@ class LivePortfolioDashboard:
         arrow = "▲" if up else "▼"
         chg = ys[-1] - self._base
         pct = (chg / self._base * 100.0) if self._base else 0.0
-        ax.text(0.985, 0.93, f"{arrow} {ys[-1]:,.2f}", transform=ax.transAxes,
+        ax.text(0.97, 0.92, f"{arrow} {ys[-1]:,.2f}", transform=ax.transAxes,
                 color=col, fontsize=8, weight="bold", family="Consolas",
                 va="top", ha="right", zorder=7)
-        ax.text(0.985, 0.80, f"{chg:+,.2f}  ({pct:+.2f}%)", transform=ax.transAxes,
+        ax.text(0.97, 0.80, f"{chg:+,.2f}  ({pct:+.2f}%)", transform=ax.transAxes,
                 color=self.C['muted'], fontsize=6.5, family="Consolas",
                 va="top", ha="right", zorder=7)
 
@@ -1394,7 +1537,7 @@ class LivePortfolioDashboard:
             self._grow_n = self._grow_to
             self._growing = False
             self._render_curve()
-            self._start_pulse_anim()
+            self._schedule_heartbeat()
         except Exception as e:
             print(f"Chart draw error: {e}")
 
@@ -1613,30 +1756,106 @@ class LivePortfolioDashboard:
         try:
             max_lvl = max(1, int(max_lvl))
             level_cnt = max(0, int(level_cnt))
-            self.dca_bar.set(min(1.0, level_cnt / max_lvl))
+            self._dca_target = min(1.0, level_cnt / max_lvl)
+            if self._dca_job is None and self.running:
+                self._dca_job = self.root.after(20, self._tick_dca_bar)
         except Exception as e:
             print(f"DCA bar error: {e}")
 
-    def _update_log_console(self):
-        """Read and append latest logs from the shared log file"""
+    def _tick_dca_bar(self):
+        """~300ms eased width transition + green→mint gradient feel."""
+        self._dca_job = None
+        if not self.running:
+            return
+        diff = self._dca_target - self._dca_current
+        if abs(diff) < 0.004:
+            self._dca_current = self._dca_target
+        else:
+            self._dca_current += diff * 0.22
+        frac = max(0.0, min(1.0, self._dca_current))
+        c1 = (0x00, 0xFF, 0x66)
+        c2 = (0x00, 0xE5, 0xFF)
+        col = '#%02x%02x%02x' % tuple(int(c1[i] + (c2[i] - c1[i]) * frac) for i in range(3))
         try:
-            log_file = Path("logs/latest_intelligence_report.txt")
-            if not log_file.exists(): return
-            
-            with open(log_file, 'r', encoding='latin-1') as f:
+            self.dca_bar.configure(progress_color=col)
+            self.dca_bar.set(self._dca_current)
+        except Exception:
+            return
+        if abs(self._dca_target - self._dca_current) >= 0.004:
+            self._dca_job = self.root.after(20, self._tick_dca_bar)
+
+    def _append_log_line(self, line, tag="INFO"):
+        """Insert one line into the terminal box, keeping it bounded."""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.insert("end", line.rstrip() + "\n", tag)
+            total = int(self.log_text.index('end-1c').split('.')[0])
+            if total > 220:
+                self.log_text.delete("1.0", f"{total - 220}.0")
+            self.log_text.see("end")
+            self.log_text.configure(state="disabled")
+        except Exception:
+            pass
+
+    def _seed_log_console(self):
+        """Immediate terminal output so the box is never blank."""
+        for line in ("[SYSTEM] NEXUS terminal online — engine bridge ready",
+                     "[MT5]   Terminal link established",
+                     "[FEED]  Heartbeat OK"):
+            self._append_log_line(line, "INFO")
+        self._placeholder_lines = [
+            "[SYSTEM] Listening on logs/grid_state.json ...",
+            "[FEED]  Subscribed to XAUUSDm M15 stream",
+            "[SYSTEM] Bot offline — start with: python live_trading.py --cron",
+            "[FEED]  Heartbeat OK",
+            "[SYSTEM] Awaiting trading engine cycle ...",
+            "[FEED]  Heartbeat OK",
+            "[SYSTEM] Telemetry buffer nominal",
+        ]
+        self._log_placeholder_job = self.root.after(2500, self._tick_log_placeholder)
+
+    def _tick_log_placeholder(self):
+        """Animated placeholder stream until real bot logs arrive."""
+        self._log_placeholder_job = None
+        if not self.running or self._log_real_seen:
+            return
+        if getattr(self, "_placeholder_lines", None):
+            line = self._placeholder_lines[self._placeholder_idx % len(self._placeholder_lines)]
+            self._placeholder_idx += 1
+            self._append_log_line(line, "INFO")
+        self._log_placeholder_job = self.root.after(3500, self._tick_log_placeholder)
+
+    def _update_log_console(self):
+        """Tail the newest live bot log (utf-8); legacy report file as fallback."""
+        try:
+            log_file = None
+            logs_dir = Path("logs")
+            if logs_dir.exists():
+                candidates = sorted(logs_dir.glob("live_trading_*.log"),
+                                    key=lambda p: p.stat().st_mtime)
+                if candidates:
+                    log_file = candidates[-1]
+                else:
+                    legacy = logs_dir / "latest_intelligence_report.txt"
+                    if legacy.exists():
+                        log_file = legacy
+            if log_file is None or log_file.stat().st_size == 0:
+                return
+            if getattr(self, "_log_file_path", None) != log_file:
+                self._log_file_path = log_file
+                self._last_log_pos = 0
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
                 content = f.read().splitlines()
-                
+            if len(content) < self._last_log_pos:
+                self._last_log_pos = 0
             new_lines = content[self._last_log_pos:]
             if new_lines:
-                self.log_text.configure(state="normal")
+                self._log_real_seen = True
                 for line in new_lines:
                     tag = "INFO"
                     if "WARNING" in line: tag = "WARNING"
                     elif "ERROR" in line: tag = "ERROR"
-                    self.log_text.insert("end", line + "\n", tag)
-                
-                self.log_text.see("end")
-                self.log_text.configure(state="disabled")
+                    self._append_log_line(line, tag)
                 self._last_log_pos = len(content)
         except Exception as e:
             print(f"Log console update error: {e}")
@@ -1661,8 +1880,18 @@ class LivePortfolioDashboard:
         from_date = datetime.now() - timedelta(days=self.history_days)
         to_date = datetime.now() + timedelta(days=1)
         
-        # --- Update Season Timer (Live every second) ---
-        elapsed = int(time.time()) - self.reset_timestamp
+        # --- Season Timer (live every tick) ---
+        # reset_timestamp==0 (fresh install) must NOT be treated as epoch-0,
+        # otherwise the timer shows ~20000+ days. Fall back to first trade time.
+        now_ts = int(time.time())
+        season_start = self.reset_timestamp if 0 < self.reset_timestamp <= now_ts else None
+
+        deals = mt5.history_deals_get(from_date, to_date)
+
+        if season_start is None:
+            entry_times = [d.time for d in deals if d.entry == 1] if deals else []
+            season_start = min(entry_times) if entry_times else now_ts
+        elapsed = max(0, now_ts - season_start)
         days = elapsed // 86400
         hours = (elapsed % 86400) // 3600
         minutes = (elapsed % 3600) // 60
@@ -1671,7 +1900,6 @@ class LivePortfolioDashboard:
         if 'season_timer' in self.grid_cards:
             self.grid_cards['season_timer'].configure(text=time_str, text_color=self.C['green'])
 
-        deals = mt5.history_deals_get(from_date, to_date)
         if deals:
             closed_deals = [d for d in deals if d.entry == 1 and d.time > self.reset_timestamp]
             
@@ -1744,13 +1972,17 @@ class LivePortfolioDashboard:
 
     def _on_closing(self):
         self.running = False
-        for job in (self._flash_job, self._dot_job, self._ticker_job, self._chart_resize_job, self._chart_anim_job):
+        for job in (self._flash_job, self._dot_job, self._ticker_job, self._chart_resize_job,
+                    self._chart_anim_job, self._dca_job, self._log_placeholder_job,
+                    self._heartbeat_job):
             if job is not None:
                 try:
                     self.root.after_cancel(job)
                 except Exception:
                     pass
-        self._flash_job = self._dot_job = self._ticker_job = self._chart_resize_job = self._chart_anim_job = None
+        self._flash_job = self._dot_job = self._ticker_job = self._chart_resize_job = None
+        self._chart_anim_job = self._dca_job = self._log_placeholder_job = None
+        self._heartbeat_job = None
         self._live_dot = None
         self._live_glow = None
         self.root.destroy()

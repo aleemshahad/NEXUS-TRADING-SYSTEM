@@ -1,3 +1,3 @@
 @echo off
-cd /d E:\NEXT-LEVEL-TRADING-SYSTEM_G_Channal
+cd /d E:\NEXUS-TRADING-SYSTEM
 python live_trading.py --cron
