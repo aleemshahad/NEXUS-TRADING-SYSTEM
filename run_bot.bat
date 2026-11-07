@@ -1,3 +1,3 @@
 @echo off
-cd /d E:\NEXUS-TRADING-SYSTEM
+cd /d "%~dp0"
 python live_trading.py --cron

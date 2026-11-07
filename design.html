@@ -639,18 +639,18 @@
 <rect fill="#10b981" height="24" rx="1" width="7" x="616.5" y="72"></rect>
 </g>
 <!-- Shaded Area Under Curve -->
-<path d="M 60,235 Q 140,225 200,190 T 320,165 T 440,132 T 560,98 T 680,68 L 680,265 L 60,265 Z" fill="url(#bull-area-laser)"></path>
+<path id="equity-area-path" d="M 60,235 Q 140,225 200,190 T 320,165 T 440,132 T 560,98 T 680,68 L 680,265 L 60,265 Z" fill="url(#bull-area-laser)"></path>
 <!-- Animated High-Precision Algorithmic Trajectory Curve -->
-<path class="svg-chart-path" d="M 60,235 Q 140,225 200,190 T 320,165 T 440,132 T 560,98 T 680,68" fill="none" filter="url(#emerald-glow-laser)" stroke="#10b981" stroke-linecap="round" stroke-width="3"></path>
+<path id="equity-line-path" class="svg-chart-path" d="M 60,235 Q 140,225 200,190 T 320,165 T 440,132 T 560,98 T 680,68" fill="none" filter="url(#emerald-glow-laser)" stroke="#10b981" stroke-linecap="round" stroke-width="3"></path>
 <!-- Prominent Live Pulse Execution Beacon Rings at Endpoint of Curve -->
-<g transform="translate(680, 68)">
+<g id="heartbeat-head" transform="translate(680, 68)">
 <circle class="svg-pulse-ring" cx="0" cy="0" fill="#10b981" opacity="0.3" r="16"></circle>
 <circle class="svg-pulse-ring" cx="0" cy="0" fill="#00f0ff" opacity="0.65" r="9"></circle>
 <circle cx="0" cy="0" fill="#ffffff" filter="url(#emerald-glow-laser)" r="5"></circle>
 <circle cx="0" cy="0" fill="#00f0ff" r="2.5"></circle>
 </g>
 <!-- Realtime Head Badge (Live Current Price Marker) -->
-<g transform="translate(615, 30)">
+<g id="heartbeat-badge" transform="translate(615, 30)">
 <rect fill="#042f2e" height="24" rx="4" stroke="#10b981" stroke-width="1.2" width="132" x="0" y="0"></rect>
 <circle class="animate-ping" cx="12" cy="12" fill="#10b981" r="3.5"></circle>
 <circle cx="12" cy="12" fill="#10b981" r="3.5"></circle>
@@ -682,8 +682,8 @@
 <div>
 <div class="text-[10px] font-mono-num text-slate-400 uppercase tracking-wider font-semibold">DCA REACTOR STAGE</div>
 <div class="font-mono-num text-sm font-bold text-white flex items-center gap-2 mt-0.5">
-<span>LVL 1 ACTIVE</span>
-<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">1/5 STEPS</span>
+<span id="dca-level-title">LVL 1 ACTIVE</span>
+<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" id="dca-steps-badge">1/5 STEPS</span>
 </div>
 </div>
 </div>
@@ -691,15 +691,15 @@
 <div class="md:col-span-6">
 <div class="grid grid-cols-5 gap-1.5 p-1 bg-[#05080c] border border-slate-800/90 rounded-md shadow-inner">
 <!-- Step 1: Energized -->
-<div class="h-3.5 rounded-sm dca-reactor-fill relative overflow-hidden"></div>
+<div class="h-3.5 rounded-sm dca-reactor-fill relative overflow-hidden" id="dca-step-1"></div>
 <!-- Step 2: Standby -->
 <div class="h-3.5 rounded-sm bg-slate-800/70 border border-slate-700/50 transition-all duration-500" id="dca-step-2"></div>
 <!-- Step 3: Standby -->
-<div class="h-3.5 rounded-sm bg-slate-800/50 border border-slate-800"></div>
+<div class="h-3.5 rounded-sm bg-slate-800/50 border border-slate-800" id="dca-step-3"></div>
 <!-- Step 4: Standby -->
-<div class="h-3.5 rounded-sm bg-slate-800/50 border border-slate-800"></div>
+<div class="h-3.5 rounded-sm bg-slate-800/50 border border-slate-800" id="dca-step-4"></div>
 <!-- Step 5: Standby -->
-<div class="h-3.5 rounded-sm bg-slate-800/50 border border-slate-800"></div>
+<div class="h-3.5 rounded-sm bg-slate-800/50 border border-slate-800" id="dca-step-5"></div>
 </div>
 </div>
 <!-- Basket PnL & Season Uptime (3 Cols) -->
@@ -736,7 +736,7 @@
 <span class="w-2 h-3.5 bg-cyan-400 rounded-sm"></span>
 <h3 class="font-tech text-sm font-bold tracking-widest text-cyan-300 uppercase">ACTIVE POSITIONS</h3>
 </div>
-<span class="text-[11px] font-mono-num text-slate-400">NET EXPOSURE: <strong class="text-rose-400 font-bold">0.05 SHORT</strong></span>
+<span class="text-[11px] font-mono-num text-slate-400">NET EXPOSURE: <strong class="text-rose-400 font-bold" id="net-exposure-badge">0.05 SHORT</strong></span>
 </div>
 <!-- Header Row -->
 <div class="grid grid-cols-4 text-[10px] font-mono-num text-slate-400 uppercase pb-1.5 border-b border-slate-800/80 px-2 font-semibold">
@@ -746,7 +746,7 @@
 <span class="text-right">PROFIT ($)</span>
 </div>
 <!-- Live Position Row with Dynamic Background Meter -->
-<div class="mt-2 space-y-2">
+<div class="mt-2 space-y-2" id="positions-container">
 <div class="relative overflow-hidden rounded-md border border-emerald-500/30 bg-slate-900/80 px-2.5 py-2.5 font-mono-num text-xs shadow-inner">
 <!-- Animated PnL Fill Bar -->
 <div class="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500/25 to-cyan-500/15 transition-all duration-300" id="pos-fill-bar" style="width: 68%;"></div>
@@ -895,7 +895,7 @@
 <!-- Row: Starting Balance -->
 <div class="telemetry-row px-3.5 py-2.5 flex items-center justify-between">
 <span class="text-xs text-slate-400">STARTING BALANCE</span>
-<span class="text-sm font-bold text-slate-200">$23,439.16</span>
+<span class="text-sm font-bold text-slate-200" id="val-start-bal">$23,439.16</span>
 </div>
 <!-- Row: Account Balance -->
 <div class="telemetry-row px-3.5 py-2.5 flex items-center justify-between">
@@ -918,7 +918,7 @@
 <!-- Row: Max Floating Drawdown ($) -->
 <div class="telemetry-row px-3.5 py-2.5 flex items-center justify-between">
 <span class="text-xs text-slate-400">MAX FLOATING (-)</span>
-<span class="text-sm font-bold text-rose-400">-$48.81</span>
+<span class="text-sm font-bold text-rose-400" id="val-max-dd-usd">-$48.81</span>
 </div>
 <!-- Row: Margin Level with Spark Micro-bar -->
 <div class="telemetry-row px-3.5 py-2.5 flex items-center justify-between" id="row-margin">
@@ -950,9 +950,9 @@
 <span class="text-xs text-slate-400">WIN RATE (%)</span>
 <div class="flex items-center gap-2">
 <div class="w-14 h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-<div class="h-full bg-cyan-400 shadow-[0_0_6px_#00f0ff]" style="width: 71.4%"></div>
+<div class="h-full bg-cyan-400 shadow-[0_0_6px_#00f0ff]" id="bar-win-rate" style="width: 71.4%"></div>
 </div>
-<span class="text-sm font-bold text-cyan-300">71.4%</span>
+<span class="text-sm font-bold text-cyan-300" id="val-win-rate">71.4%</span>
 </div>
 </div>
 <!-- Row: Profit Factor -->
@@ -963,7 +963,7 @@
 <!-- Row: Max Drawdown (%) -->
 <div class="telemetry-row px-3.5 py-2.5 flex items-center justify-between">
 <span class="text-xs text-slate-400">MAX DRAWDOWN</span>
-<span class="text-sm font-bold text-rose-400">0.07%</span>
+<span class="text-sm font-bold text-rose-400" id="val-max-dd-pct">0.07%</span>
 </div>
 </div>
 </div>
@@ -1108,45 +1108,131 @@ if __name__ == "__main__":
 
     // --- Live Tick Simulation & Right-Side Telemetry Updater ---
     function applyStateToDOM(isGain) {
-      const fmtCurrency = (v) => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      document.getElementById('val-live-price').textContent = state.livePrice.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-      document.getElementById('val-equity').textContent = fmtCurrency(state.equity);
-      document.getElementById('chart-live-eq').textContent = `${isGain ? '▲' : '▼'} ${fmtCurrency(state.equity)}`;
+      const fmtCurrency = (v) => '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      
+      const elPrice = document.getElementById('val-live-price');
+      if (elPrice && state.livePrice !== undefined) {
+        elPrice.textContent = Number(state.livePrice).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+      }
+
+      const elEq = document.getElementById('val-equity');
+      if (elEq && state.equity !== undefined) {
+        elEq.textContent = fmtCurrency(state.equity);
+      }
+
+      const elChartLiveEq = document.getElementById('chart-live-eq');
+      if (elChartLiveEq && state.equity !== undefined) {
+        elChartLiveEq.textContent = `${isGain ? '▲' : '▼'} ${fmtCurrency(state.equity)}`;
+      }
       
       const badgeTxt = document.getElementById('svg-live-badge-txt');
-      if (badgeTxt) {
+      if (badgeTxt && state.livePrice !== undefined) {
         badgeTxt.textContent = `CURRENT: $${Math.round(state.livePrice).toLocaleString('en-US')}`;
       }
 
-      const pnlPrefix = state.sessionPnl >= 0 ? '+$' : '-$';
-      document.getElementById('val-session-pnl').textContent = pnlPrefix + Math.abs(state.sessionPnl).toFixed(2);
+      const elStartBal = document.getElementById('val-start-bal');
+      if (elStartBal && state.startingBalance !== undefined) {
+        elStartBal.textContent = fmtCurrency(state.startingBalance);
+      }
+
+      const elAccBal = document.getElementById('val-acc-bal');
+      if (elAccBal && state.accountBalance !== undefined) {
+        elAccBal.textContent = fmtCurrency(state.accountBalance);
+      }
+
+      const elSessPnl = document.getElementById('val-session-pnl');
+      if (elSessPnl && state.sessionPnl !== undefined) {
+        const pnlPrefix = state.sessionPnl >= 0 ? '+$' : '-$';
+        elSessPnl.textContent = pnlPrefix + Math.abs(state.sessionPnl).toFixed(2);
+        elSessPnl.className = state.sessionPnl >= 0 
+          ? "text-sm font-extrabold text-emerald-400 glow-emerald" 
+          : "text-sm font-extrabold text-rose-400 glow-rose";
+      }
+
+      const elMaxDd = document.getElementById('val-max-dd-usd');
+      if (elMaxDd && state.maxFloatingMinus !== undefined) {
+        elMaxDd.textContent = `-$${Math.abs(Number(state.maxFloatingMinus) || 0).toFixed(2)}`;
+      }
       
-      const basketPrefix = state.basketPnl >= 0 ? '+$' : '-$';
-      const basketText = basketPrefix + Math.abs(state.basketPnl).toFixed(2);
-      document.getElementById('basket-pnl-val').textContent = basketText;
-      document.getElementById('pos-pnl-cell').textContent = basketText;
-      document.getElementById('val-atr').textContent = state.atr.toFixed(2);
-      document.getElementById('val-margin').textContent = state.marginLevel.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+      const elBasketPnl = document.getElementById('basket-pnl-val');
+      if (elBasketPnl && state.basketPnl !== undefined) {
+        const basketPrefix = state.basketPnl >= 0 ? '+$' : '-$';
+        elBasketPnl.textContent = basketPrefix + Math.abs(state.basketPnl).toFixed(2);
+        elBasketPnl.className = state.basketPnl >= 0 ? "font-bold text-emerald-400 text-sm glow-emerald" : "font-bold text-rose-400 text-sm glow-rose";
+      }
+
+      const elAtr = document.getElementById('val-atr');
+      if (elAtr && state.atr !== undefined) {
+        elAtr.textContent = Number(state.atr).toFixed(2);
+      }
+
+      const elPivot = document.getElementById('val-pivot');
+      if (elPivot && state.pivot !== undefined) {
+        elPivot.textContent = `$${Number(state.pivot).toFixed(2)}`;
+      }
+
+      const elMargin = document.getElementById('val-margin');
+      if (elMargin && state.marginLevel !== undefined) {
+        elMargin.textContent = Number(state.marginLevel).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+      }
+
+      // Statistical Efficiency
+      const elTrades = document.getElementById('val-trades');
+      if (elTrades && state.totalTrades !== undefined) {
+        elTrades.textContent = String(state.totalTrades);
+      }
+
+      const elWinRate = document.getElementById('val-win-rate');
+      const elWinBar = document.getElementById('bar-win-rate');
+      if (state.winRate !== undefined) {
+        const wrPct = (state.winRate <= 1 ? state.winRate * 100 : state.winRate);
+        if (elWinRate) elWinRate.textContent = `${wrPct.toFixed(1)}%`;
+        if (elWinBar) elWinBar.style.width = `${Math.min(100, Math.max(0, wrPct)).toFixed(1)}%`;
+      }
+
+      const elPf = document.getElementById('val-pf');
+      if (elPf && state.profitFactor !== undefined) {
+        const pfVal = Number(state.profitFactor);
+        elPf.textContent = isFinite(pfVal) ? pfVal.toFixed(2) : '∞';
+      }
+
+      const elMaxDdPct = document.getElementById('val-max-dd-pct');
+      if (elMaxDdPct && state.maxDrawdownPct !== undefined) {
+        elMaxDdPct.textContent = `${Number(state.maxDrawdownPct).toFixed(2)}%`;
+      }
 
       // Update Delta vs Starting Balance
-      const netDelta = state.equity - state.startingBalance;
-      const pctDelta = (netDelta / state.startingBalance) * 100;
-      document.getElementById('chart-delta-badge').textContent =
-        `${netDelta >= 0 ? '+' : '-'}$${Math.abs(netDelta).toFixed(2)} (${pctDelta >= 0 ? '+' : ''}${pctDelta.toFixed(2)}%)`;
+      if (state.equity !== undefined && state.startingBalance) {
+        const netDelta = state.equity - state.startingBalance;
+        const pctDelta = (netDelta / state.startingBalance) * 100;
+        const elDelta = document.getElementById('chart-delta-badge');
+        if (elDelta) {
+          elDelta.textContent = `${netDelta >= 0 ? '+' : '-'}$${Math.abs(netDelta).toFixed(2)} (${pctDelta >= 0 ? '+' : ''}${pctDelta.toFixed(2)}%)`;
+          elDelta.className = netDelta >= 0 
+            ? "text-emerald-400 font-semibold px-2 py-0.5 rounded bg-slate-900/80 border border-slate-800"
+            : "text-rose-400 font-semibold px-2 py-0.5 rounded bg-slate-900/80 border border-slate-800";
+        }
+      }
 
-      // Update Active Position Fill Bar & Target Bar
-      const fillPct = Math.min(Math.max((state.basketPnl / 12) * 100, 15), 95);
-      document.getElementById('pos-fill-bar').style.width = `${fillPct.toFixed(0)}%`;
-      const globalPct = Math.min(Math.max((state.sessionPnl / 100) * 100, 5), 100);
-      document.getElementById('target-progress-bar').style.width = `${globalPct.toFixed(1)}%`;
-      document.getElementById('target-progress-label').textContent =
-        `$${state.sessionPnl.toFixed(2)} / $100.00 (${globalPct.toFixed(1)}%)`;
+      // Update Target Progress Bar
+      if (state.sessionPnl !== undefined) {
+        const targetVal = state.targetPnl || 100.0;
+        const globalPct = Math.min(Math.max((state.sessionPnl / targetVal) * 100, 5), 100);
+        const elTargetBar = document.getElementById('target-progress-bar');
+        const elTargetLbl = document.getElementById('target-progress-label');
+        if (elTargetBar) elTargetBar.style.width = `${globalPct.toFixed(1)}%`;
+        if (elTargetLbl) elTargetLbl.textContent = `$${state.sessionPnl.toFixed(2)} / $${targetVal.toFixed(2)} (${globalPct.toFixed(1)}%)`;
+      }
 
       // Update ICT Confidence Radial Gauge Arc
-      const circumference = 326.7;
-      const offset = circumference - (state.confidence / 100) * circumference;
-      document.getElementById('conf-arc').style.strokeDashoffset = offset.toFixed(1);
-      document.getElementById('conf-pct-text').textContent = `${state.confidence.toFixed(1)}%`;
+      if (state.confidence !== undefined) {
+        const circumference = 326.7;
+        const offset = circumference - (state.confidence / 100) * circumference;
+        const elArc = document.getElementById('conf-arc');
+        const elConfTxt = document.getElementById('conf-pct-text');
+        if (elArc) elArc.style.strokeDashoffset = offset.toFixed(1);
+        if (elConfTxt) elConfTxt.textContent = `${state.confidence.toFixed(1)}%`;
+      }
 
       // Flash Right Telemetry Rows
       flashRow('row-price', isGain);
@@ -1154,12 +1240,275 @@ if __name__ == "__main__":
       flashRow('row-pnl', isGain);
     }
 
+    // --- High-Precision SVG Performance Curve & Heartbeat Endpoint Updater ---
+    function updatePerformanceCurve(equityHistory, currentPrice) {
+      if (!equityHistory || equityHistory.length === 0) return;
+      const linePath = document.getElementById('equity-line-path');
+      const areaPath = document.getElementById('equity-area-path');
+      const head = document.getElementById('heartbeat-head');
+      const badge = document.getElementById('heartbeat-badge');
+      const badgeTxt = document.getElementById('svg-live-badge-txt');
+      if (!linePath || !areaPath || !head || !badge) return;
+
+      const minX = 60, maxX = 700;
+      const minY = 40, maxY = 240;
+      const bottomY = 265;
+
+      const n = equityHistory.length;
+      let minVal = Math.min(...equityHistory);
+      let maxVal = Math.max(...equityHistory);
+      if (maxVal === minVal) {
+        maxVal += 1.0;
+        minVal -= 1.0;
+      }
+      const valRange = maxVal - minVal;
+
+      const points = equityHistory.map((val, idx) => {
+        const x = n === 1 ? maxX : minX + (idx / (n - 1)) * (maxX - minX);
+        const y = maxY - ((val - minVal) / valRange) * (maxY - minY);
+        return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      });
+
+      let dLine = `M ${points[0].x},${points[0].y}`;
+      if (points.length === 1) {
+        dLine = `M ${minX},${points[0].y} L ${maxX},${points[0].y}`;
+      } else {
+        for (let i = 1; i < points.length; i++) {
+          const p0 = points[i - 1];
+          const p1 = points[i];
+          const cx = (p0.x + p1.x) / 2;
+          dLine += ` C ${cx},${p0.y} ${cx},${p1.y} ${p1.x},${p1.y}`;
+        }
+      }
+
+      const lastPt = points[points.length - 1];
+      const dArea = `${dLine} L ${lastPt.x},${bottomY} L ${points[0].x},${bottomY} Z`;
+
+      linePath.setAttribute('d', dLine);
+      areaPath.setAttribute('d', dArea);
+
+      head.setAttribute('transform', `translate(${lastPt.x}, ${lastPt.y})`);
+      const badgeX = Math.max(50, Math.min(650, lastPt.x - 65));
+      const badgeY = Math.max(10, Math.min(230, lastPt.y - 38));
+      badge.setAttribute('transform', `translate(${badgeX}, ${badgeY})`);
+
+      const latestEq = equityHistory[equityHistory.length - 1];
+      if (badgeTxt) {
+        badgeTxt.textContent = `CURRENT: $${latestEq.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      }
+    }
+
+    // --- Dynamic Active Positions Table ---
+    function updatePositionsTable(positions) {
+      const container = document.getElementById('positions-container');
+      const netBadge = document.getElementById('net-exposure-badge');
+      if (!container) return;
+
+      if (!positions || positions.length === 0) {
+        if (netBadge) {
+          netBadge.textContent = '0.00 FLAT';
+          netBadge.className = 'text-slate-400 font-bold';
+        }
+        container.innerHTML = `
+          <div class="rounded-md border border-slate-800/80 bg-[#060a10] px-2.5 py-3 font-mono-num text-xs flex items-center justify-between text-slate-400">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-slate-300 font-semibold">NO ACTIVE POSITIONS</span>
+              <span class="text-[10px] px-1.5 py-0.2 bg-slate-800 text-cyan-300 rounded font-medium">SCANNING</span>
+            </div>
+            <span class="text-[11px] text-slate-500">AWAITING SETUP</span>
+          </div>
+        `;
+        return;
+      }
+
+      let totalBuy = 0, totalSell = 0;
+      let html = '';
+      positions.forEach(p => {
+        const isBuy = p.type === 'BUY' || p.type === 0;
+        const vol = parseFloat(p.volume || 0);
+        if (isBuy) totalBuy += vol;
+        else totalSell += vol;
+        const profit = parseFloat(p.profit || 0);
+        const pnlPrefix = profit >= 0 ? '+$' : '-$';
+        const pnlColor = profit >= 0 ? 'text-emerald-400 glow-emerald' : 'text-rose-400 glow-rose';
+        const sideClass = isBuy 
+          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
+          : 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+        const fillWidth = Math.min(Math.max((profit / 15) * 100, 10), 95);
+
+        html += `
+          <div class="relative overflow-hidden rounded-md border border-slate-800 bg-slate-900/80 px-2.5 py-2 font-mono-num text-xs shadow-inner">
+            <div class="absolute inset-y-0 left-0 bg-gradient-to-r ${profit >= 0 ? 'from-emerald-500/20 to-cyan-500/10' : 'from-rose-500/20 to-amber-500/10'} transition-all duration-300" style="width: ${fillWidth}%;"></div>
+            <div class="relative z-10 grid grid-cols-4 items-center">
+              <div class="font-bold text-white flex items-center gap-1.5 truncate">
+                <span class="w-1.5 h-1.5 rounded-full ${profit >= 0 ? 'bg-emerald-400' : 'bg-rose-400'} animate-ping"></span>
+                <span>${p.symbol}</span>
+              </div>
+              <div>
+                <span class="px-1.5 py-0.5 text-[10px] font-bold border rounded ${sideClass}">${isBuy ? 'BUY' : 'SELL'}</span>
+              </div>
+              <div class="text-right text-slate-200 font-semibold">${vol.toFixed(2)}</div>
+              <div class="text-right font-bold ${pnlColor}">${pnlPrefix}${Math.abs(profit).toFixed(2)}</div>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+
+      if (netBadge) {
+        const net = totalBuy - totalSell;
+        if (Math.abs(net) < 0.001) {
+          netBadge.textContent = 'HEDGED';
+          netBadge.className = 'text-cyan-300 font-bold';
+        } else if (net > 0) {
+          netBadge.textContent = `${net.toFixed(2)} LONG`;
+          netBadge.className = 'text-emerald-400 font-bold';
+        } else {
+          netBadge.textContent = `${Math.abs(net).toFixed(2)} SHORT`;
+          netBadge.className = 'text-rose-400 font-bold';
+        }
+      }
+    }
+
+    // --- Dynamic DCA Reactor Updater ---
+    function updateDcaReactor(level, maxLevels, basketPnl) {
+      const title = document.getElementById('dca-level-title');
+      const badge = document.getElementById('dca-steps-badge');
+      const lvlNum = Number(level) || 0;
+      const maxNum = Number(maxLevels) || 5;
+      if (title) title.textContent = `LVL ${lvlNum} ${lvlNum > 0 ? 'ACTIVE' : 'STANDBY'}`;
+      if (badge) badge.textContent = `${lvlNum}/${maxNum} STEPS`;
+
+      for (let i = 1; i <= 5; i++) {
+        const stepEl = document.getElementById(`dca-step-${i}`);
+        if (!stepEl) continue;
+        if (i <= lvlNum) {
+          stepEl.className = 'h-3.5 rounded-sm dca-reactor-fill relative overflow-hidden';
+        } else if (i === lvlNum + 1) {
+          stepEl.className = 'h-3.5 rounded-sm bg-slate-800/70 border border-slate-700/50 transition-all duration-500';
+        } else {
+          stepEl.className = 'h-3.5 rounded-sm bg-slate-800/50 border border-slate-800';
+        }
+      }
+    }
+
+    // --- Dynamic ICT Rail Confluence Updater ---
+    function updateIctRail(ictData) {
+      if (!ictData) return;
+      if (ictData.confidence !== undefined) {
+        const pct = typeof ictData.confidence === 'number' && ictData.confidence <= 1 
+          ? ictData.confidence * 100 
+          : parseFloat(ictData.confidence || 0);
+        state.confidence = pct;
+        const circumference = 326.7;
+        const offset = circumference - (pct / 100) * circumference;
+        const arc = document.getElementById('conf-arc');
+        if (arc) arc.style.strokeDashoffset = offset.toFixed(1);
+        const txt = document.getElementById('conf-pct-text');
+        if (txt) txt.textContent = `${pct.toFixed(1)}%`;
+      }
+      if (ictData.action) {
+        const badge = document.getElementById('conf-action-badge');
+        if (badge) {
+          const act = ictData.action.toUpperCase();
+          badge.textContent = `ACTION: ${act}`;
+          if (act === 'BUY') {
+            badge.className = 'mt-0.5 px-2 py-0.5 text-[9px] font-mono-num font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded shadow-[0_0_8px_rgba(16,185,129,0.3)]';
+          } else if (act === 'SELL') {
+            badge.className = 'mt-0.5 px-2 py-0.5 text-[9px] font-mono-num font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded shadow-[0_0_8px_rgba(244,63,94,0.3)]';
+          } else {
+            badge.className = 'mt-0.5 px-2 py-0.5 text-[9px] font-mono-num font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded shadow-[0_0_8px_rgba(245,158,11,0.3)]';
+          }
+        }
+      }
+      if (ictData.kill_zone) {
+        const kz = document.getElementById('kz-label');
+        if (kz) kz.textContent = ictData.kill_zone;
+      }
+      if (ictData.confluence_ratio) {
+        const cr = document.getElementById('conf-ratio');
+        if (cr) cr.textContent = ictData.confluence_ratio;
+      }
+      const sigs = (ictData.signals || []).map(s => String(s).toUpperCase());
+      const setNode = (id, active, activeCls) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (active) {
+          el.className = `signal-node ${activeCls} rounded-lg p-2.5 backdrop-blur-sm cursor-pointer`;
+          el.style.opacity = '1';
+        } else {
+          el.className = 'signal-node rounded-lg p-2.5 backdrop-blur-sm cursor-pointer border border-slate-800';
+          el.style.opacity = '0.6';
+        }
+      };
+      setNode('node-sweep', sigs.includes('LIQUIDITY_SWEEP') || sigs.includes('SWEEP'), 'active-emerald');
+      setNode('node-ob', sigs.includes('ORDER_BLOCK') || sigs.includes('OB'), 'active-cyan');
+      setNode('node-fvg', sigs.includes('FVG') || sigs.includes('IMBALANCE'), 'active-emerald');
+      setNode('node-trend', ictData.h4_trend && ictData.h4_trend !== 'NORMAL', ictData.h4_trend === 'BULLISH' ? 'active-emerald' : 'active-crimson');
+      setNode('node-trap', ictData.trap_filter === 'CONFIRMED' || ictData.trap_filter === 'CLEAR', 'active-amber');
+      setNode('node-vol', ictData.volume_surge || (ictData.volume_flow && ictData.volume_flow.score > 0.5), 'active-cyan');
+
+      if (ictData.bias) {
+        const biasEl = document.getElementById('bias-readout');
+        if (biasEl) {
+          const b = ictData.bias.toUpperCase();
+          const isBull = b.includes('BULL');
+          const arrow = isBull ? '▲' : '▼';
+          const col = isBull ? 'text-emerald-400' : 'text-rose-400';
+          biasEl.className = `font-bold ${col} flex items-center gap-1 text-sm mt-0.5`;
+          biasEl.innerHTML = `<span class="animate-bounce">${arrow}</span><span>${b} FLOW</span>`;
+        }
+      }
+    }
+
     // Bridge hook so external Python PyWebView `window.evaluate_js` can push live state directly
     window.receivePythonState = function(payload) {
+      if (simTimer) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
       const isGain = (payload.equity ?? state.equity) >= state.equity;
       Object.assign(state, payload);
       applyStateToDOM(isGain);
+
+      if (payload.equity_history && Array.isArray(payload.equity_history)) {
+        updatePerformanceCurve(payload.equity_history, payload.livePrice);
+      }
+      if (payload.positions !== undefined) {
+        updatePositionsTable(payload.positions);
+      }
+      if (payload.dca_level !== undefined) {
+        updateDcaReactor(payload.dca_level, payload.max_dca_levels || 5, payload.basketPnl);
+      }
+      if (payload.ict) {
+        updateIctRail(payload.ict);
+      }
+      if (payload.season_seconds !== undefined) {
+        state.seasonSeconds = payload.season_seconds;
+      }
+      if (payload.logs && Array.isArray(payload.logs)) {
+        payload.logs.forEach(l => {
+          appendLogEntry(typeof l === 'string' ? parseRawLog(l) : l);
+        });
+      }
     };
+
+    function parseRawLog(rawStr) {
+      let cat = 'SYS';
+      let level = 'INFO';
+      let color = 'text-cyan-400';
+      const str = String(rawStr);
+      if (str.includes('[ICT') || str.includes('ICT Analysis')) {
+        cat = 'ICT'; level = 'ICT'; color = 'text-violet-400';
+      } else if (str.includes('[Grid]') || str.includes('TRADE') || str.includes('EXEC') || str.includes('ORDER')) {
+        cat = 'EXEC'; level = 'EXEC'; color = 'text-amber-400';
+      } else if (str.includes('WARNING') || str.includes('ERROR')) {
+        level = str.includes('ERROR') ? 'ERROR' : 'WARN';
+        color = 'text-rose-400';
+      }
+      return { cat, level, color, msg: str };
+    }
 
     // Internal Real-Time Simulation Loop
     let simTimer = null;
@@ -1271,11 +1620,24 @@ if __name__ == "__main__":
       rawLogs.length = 0;
       appendLogEntry({ cat: 'SYS', level: 'SYS', color: 'text-amber-400', msg: 'Terminal log history cleared by operator.' });
       showStatusToast('LOG HISTORY CLEARED');
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.clear_history) {
+        window.pywebview.api.clear_history().then(res => {
+          if (res && res.message) showStatusToast(res.message);
+        }).catch(err => console.error("pywebview clear_history error:", err));
+      }
     }
 
     function triggerFullReport() {
-      appendLogEntry({ cat: 'EXEC', level: 'EXEC', color: 'text-emerald-400', msg: `Generated institutional telemetry snapshot — Equity: $${state.equity.toFixed(2)}, PF: 3.84` });
-      showStatusToast('FULL TELEMETRY REPORT GENERATED');
+      appendLogEntry({ cat: 'EXEC', level: 'EXEC', color: 'text-emerald-400', msg: `Generating institutional telemetry snapshot...` });
+      showStatusToast('GENERATING REPORT...');
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.generate_report) {
+        window.pywebview.api.generate_report().then(res => {
+          if (res && res.message) {
+            showStatusToast(res.message);
+            appendLogEntry({ cat: 'EXEC', level: 'REPORT', color: 'text-emerald-400', msg: res.message });
+          }
+        }).catch(err => console.error("pywebview generate_report error:", err));
+      }
     }
 
     // --- Press-and-Hold Safety Action Mechanism ---
@@ -1293,6 +1655,18 @@ if __name__ == "__main__":
           fill.style.width = '0%';
           appendLogEntry({ cat: 'EXEC', level: 'ALERT', color: 'text-rose-400', msg: `[OPERATOR OVERRIDE] ${successMessage}` });
           showStatusToast(successMessage);
+          
+          if (window.pywebview && window.pywebview.api) {
+            if (successMessage.includes('EMERGENCY RESET') && window.pywebview.api.emergency_reset) {
+              window.pywebview.api.emergency_reset().then(res => {
+                if (res && res.message) showStatusToast(res.message);
+              }).catch(err => console.error("pywebview emergency_reset error:", err));
+            } else if (successMessage.includes('PENDING') && window.pywebview.api.delete_pendings) {
+              window.pywebview.api.delete_pendings().then(res => {
+                if (res && res.message) showStatusToast(res.message);
+              }).catch(err => console.error("pywebview delete_pendings error:", err));
+            }
+          }
         }
       }, 35);
     }

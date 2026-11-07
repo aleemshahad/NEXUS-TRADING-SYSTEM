@@ -9,3 +9,4 @@ matplotlib
 plotly
 customtkinter
 pywinstyles
+pywebview
