@@ -1425,20 +1425,23 @@ class LivePortfolioDashboard:
         xs = np.arange(n, dtype=float)
         ys = disp[:n]
 
-        ax.set_xlim(0, len(disp) - 1)
+        ax.set_xlim(0, max(n - 1, 1))
         ax.set_ylim(self._ylo, self._yhi)
 
         up = ys[-1] >= self._base
         col = self.C['green'] if up else self.C['red']
 
-        # Start-balance dashed baseline + label
-        ax.axhline(self._base, color=self.C['border'], lw=0.9, ls=(0, (4, 3)), zorder=1)
-        ax.text(0.006, 0.02, f"START ${self._base:,.0f}", transform=ax.transAxes,
-                color=self.C['muted'], fontsize=6.5, family="Consolas",
-                va="bottom", ha="left", zorder=2)
+        baseline_visible = self._ylo <= self._base <= self._yhi
+        if baseline_visible:
+            ax.axhline(self._base, color=self.C['border'], lw=0.9,
+                       ls=(0, (4, 3)), zorder=1)
+            ax.text(0.006, 0.02, f"START ${self._base:,.0f}", transform=ax.transAxes,
+                    color=self.C['muted'], fontsize=6.5, family="Consolas",
+                    va="bottom", ha="left", zorder=2)
 
         # Soft area fill under the curve down to the baseline
-        ax.fill_between(xs, ys, self._base, color=col, alpha=0.12,
+        fill_level = self._base if baseline_visible else self._ylo
+        ax.fill_between(xs, ys, fill_level, color=col, alpha=0.12,
                         linewidth=0, zorder=2)
 
         # Glow pass (wide, translucent) + crisp core line
@@ -1506,15 +1509,15 @@ class LivePortfolioDashboard:
                 self._render_empty()
                 return
 
-            # Downsample for display and anchor the y-range so the curve always
-            # breathes visibly around the baseline (no dead space / flat lines).
+            # Scale to the displayed series; a stale session baseline should
+            # not leave the live curve compressed against one edge.
             disp = self._sample_series(points, 160)
             base = float(self.start_balance) if self.start_balance else float(points[0])
 
-            lo = min(float(disp.min()), base)
-            hi = max(float(disp.max()), base)
+            lo = float(disp.min())
+            hi = float(disp.max())
             raw = hi - lo
-            pad = max(raw * 0.10, max(lo * 0.002, 25.0))
+            pad = max(raw * 0.10, abs((lo + hi) / 2) * 0.0001, 1.0)
             self._ylo, self._yhi = lo - pad, hi + pad
 
             prev_n = self._grow_n if self._grow_to == len(disp) else max(2, self._grow_n)
